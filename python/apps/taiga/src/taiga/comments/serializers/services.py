@@ -4,15 +4,9 @@
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 #
 # Copyright (c) 2023-present Kaleidos INC
-
-from taiga.base.db import models
 from taiga.comments.models import Comment
+from taiga.comments.serializers import CommentDetailSerializer
 
 
-class StoryCommentsMixin(models.Model):
-    comments = models.GenericRelation(
-        Comment, content_type_field="object_content_type", object_id_field="object_id", related_query_name="story"
-    )
-
-    class Meta:
-        abstract = True
+def serialize_comment(comment: Comment) -> CommentDetailSerializer:
+    return CommentDetailSerializer.from_orm(comment)
