@@ -1,0 +1,65 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+#
+# Copyright (c) 2021-present Kaleidos Ventures SL
+
+FROM python:3.11-slim
+LABEL maintainer="support@taiga.io"
+
+# Avoid prompting for configuration
+ENV DEBIAN_FRONTEND=noninteractive
+
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONFAULTHANDLER=1
+
+# Use a virtualenv
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Get the code
+COPY python/ /backend/
+
+WORKDIR /backend/apps/taiga
+
+RUN set -eux; \
+    apt-get update; \
+    # install system dependencies
+    apt-get install -y \
+        build-essential \
+        # libpq5 needed in runtime for psycopg2
+        libpq5 \
+        libpq-dev \
+        wget\
+    ; \
+    # =====================================
+    # install Taiga
+    python -m pip install --upgrade pip wheel setuptools; \
+    python -m pip install -r requirements/prod.txt; \
+    python -m pip install -e .; \
+    # =====================================
+    # create taiga group and user to use it and give permissions over the code (in entrypoint)
+    groupadd --system taiga --gid=999; \
+    useradd --system --no-create-home --gid taiga --uid=999 --shell=/bin/bash taiga; \
+    mkdir -p /backend/media/exports; \
+    chown -R taiga:taiga /backend; \
+    # =====================================
+    # remove unneeded files and packages
+    apt-get purge -y \
+        libpq-dev \
+        wget \
+    ; \
+    apt-get autoremove -y; \
+    rm -rf /var/lib/apt/lists/*; \
+    rm -rf /root/.cache; \
+    # =====================================
+    # clean taiga
+    rm -rf apps/taiga/requirements/; \
+    find . -name '__pycache__' -exec rm -r '{}' +; \
+    find . -name '*pyc' -exec rm -r '{}' +;
+
+USER taiga:taiga
+EXPOSE 8000
+ENTRYPOINT ["python", "-m", "taiga"]
+CMD ["--help"]
